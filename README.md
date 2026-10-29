@@ -64,7 +64,7 @@ zoezi waitlist leave --workout 123
 Read the actual workout ID from the schedule. Dates in examples are illustrative. The same workout ID is used for booking and cancellation. Booking uses an existing training card; the CLI does not buy anything or fall back to a payment method.
 
 - `join` enters the queue when a class is full; `claim` takes an offered available place from an existing queue entry. Zoezi's corresponding API endpoint names are different from those CLI verbs.
-- Results distinguish `confirmed`, `waitlisted` and `absent`. Queue positions are included when Zoezi returns them. A queue entry promoted to confirmed cannot be removed by `waitlist leave`; explicit cancellation is required.
+- Results distinguish `confirmed`, `waitlisted` and `absent`. Queue positions are included when Zoezi returns them. `waitlist leave` refuses when its fresh preflight finds a confirmed reservation. Zoezi exposes no conditional queue-only cancellation, so an automatic promotion can still race the subsequent server request.
 - Date windows are half-open: `--date 2026-11-03 --days 2` covers November 3 and 4. Offsets are explicit, including daylight-saving transitions. Unknown capacity remains `null`.
 - `--dry-run` performs reads, never a speculative booking. It is a preflight, not an upstream reservation or guarantee.
 - Booking an already confirmed class and removing an absent reservation are no-ops. Writes are read back before success is reported. A lost response is reconciled; timed-out writes are never repeated automatically.
@@ -106,6 +106,8 @@ Each release has a distinct PEP 440 version (`0.1.0.post<workflow-run-number>`) 
 | `SHA256SUMS` | Checksums for the release files |
 
 Failed checks prevent publication. No workflow concurrency group drops intermediate master commits. Re-running the same workflow updates only the release for that exact source commit. GitHub's built-in `GITHUB_TOKEN` publishes the assets.
+
+GitHub-hosted runner access and sufficient Actions allowance are required. An account budget policy can prevent jobs from starting. The local development/build commands below reproduce validation without changing billing or repository visibility.
 
 ## Output and environment
 

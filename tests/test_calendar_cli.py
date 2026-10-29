@@ -54,6 +54,13 @@ class CalendarTests(unittest.TestCase):
         event["event_id"] = "existing-id"
         self.assertEqual(calendar.plan(self.client, [event])["changes"][0]["event_id"], "existing-id")
 
+    def test_plan_requires_real_external_id_for_updates(self):
+        event = calendar.events(self.client)[0]
+        event["summary"] = "Outdated title"
+        with self.assertRaises(ZoeziError) as err:
+            calendar.plan(self.client, [event])
+        self.assertEqual(err.exception.code, "invalid_calendar_data")
+
     def test_ics_escaping_unicode_folding_and_dst(self):
         event = calendar.events(self.client)[0]
         event["summary"] = "Träning; " + "å" * 80 + ",\nTest"

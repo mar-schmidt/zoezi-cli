@@ -5,7 +5,7 @@ Primary sources: [Zoezi API documentation](https://developer.zoezi.se/apidoc/), 
 | CLI capability | Method and path | Verification |
 |---|---|---|
 | Setup, fields, doctor, rules | GET `/api/public/settings/get` | Live |
-| Password login / refresh | POST `/api/v8.0/memberapi/login` | Live login; automatic recovery also offline tested |
+| Password login / refresh | POST `/api/v8.0/memberapi/login` | Live login and recovery from an invalid session; also offline tested |
 | Current member | GET `/api/memberapi/get/current` | Live |
 | Schedule | GET `/api/public/workout/get/all` | Live |
 | Workout details | GET `/api/memberapi/workout/get` | Live |
@@ -32,6 +32,7 @@ The live tenant accepted member login/read/booking/cancellation without an integ
 - Booking and cancellation use workout IDs; returned booking IDs are not cancellation IDs.
 - The same add API is used for queue entry. A race can produce a confirmed place instead. The CLI reports readback, not the caller's predicted state.
 - `workoutBooking/join` is a queue **claim**, not initial queue joining.
+- Queue leaving checks fresh status first. The remove API has no documented atomic queue-status precondition; promotion can race that check and write. Do not describe the client-side check as a server transaction.
 - Cancellation timing comes from the workout category's `unregisterHoursBefore`; booking windows use `registerDaysBefore`, `registerHoursBefore`, `allowBookingAfterStarted`, `dropin` and the facility release time. No global `canCancel` setting is assumed to describe workout cancellation policy.
 - All writes use existing membership coverage and leave authoritative eligibility/weekly limits with Zoezi. The CLI does not purchase fallback coverage.
 - Dates from the API are local naive timestamps. The CLI applies the configured IANA zone and emits explicit offsets. Windows are filtered locally to avoid inclusive upstream boundary surprises.

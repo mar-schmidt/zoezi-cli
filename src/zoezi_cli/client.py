@@ -56,6 +56,7 @@ class Client:
         self.now = now or (lambda: datetime.now(self.tz))
         self.transport = transport or Transport(self.tenant, api_key=os.environ.get("ZOEZI_API_KEY"))
         self.auto_login = auto_login
+        self.member_id = None
         self.username = os.environ.get("ZOEZI_USERNAME") or self.config.get("username")
         self.secrets = [os.environ.get("ZOEZI_PASSWORD"), os.environ.get("ZOEZI_API_KEY")]
         self._settings = None
@@ -63,6 +64,7 @@ class Client:
         if state.get("tenant") == self.tenant and (not self.username or state.get("username") == self.username):
             self.transport.set_session(state.get("session"))
             self.username = self.username or state.get("username")
+            self.member_id = state.get("member_id")
             self.secrets.append(state.get("session"))
 
     def settings(self):
@@ -102,7 +104,8 @@ class Client:
         self.transport.set_session(session)
         self.secrets.append(session)
         self.username = username
-        write_json(self.root / "session.json", {"tenant": self.tenant, "username": username, "session": session})
+        self.member_id = member["id"]
+        write_json(self.root / "session.json", {"tenant": self.tenant, "username": username, "member_id": self.member_id, "session": session})
         self.config.update(tenant=self.tenant, timezone=str(self.tz), username=username)
         write_json(self.root / "config.json", self.config)
         if save_credentials:
@@ -156,7 +159,9 @@ class Client:
         return summary
 
     def profile(self):
-        return self.member_summary(self.request("GET", "/api/memberapi/get/current"))
+        member = self.request("GET", "/api/memberapi/get/current")
+        self.member_id = member["id"]
+        return self.member_summary(member)
 
     def fields(self):
         settings = self.settings()
@@ -227,7 +232,7 @@ class Client:
         if space is not None and space != 0 and booked_count is not None and queue_count is not None:
             remaining = max(0, space - (booked_count - queue_count))
         return {
-            "workout_id": workout.get("id"), "name": kind.get("name") or workout.get("name"),
+            "workout_id": workout.get("id"), "member_id": workout.get("user_id"), "name": kind.get("name") or workout.get("name"),
             "extra_title": workout.get("extra_title"), "description": workout.get("description"),
             "start": start.isoformat() if start else None, "end": end.isoformat() if end else None,
             "timezone": str(self.tz), "site_id": workout.get("site_id"), "category_id": kind.get("category_id"),
@@ -258,8 +263,10 @@ class Client:
     def bookings(self, *, start=None, days=31):
         first, last = self.window(start, days)
         data = self.request("GET", "/api/memberapi/bookings/get", params={"startTime": str(first) + " 00:00:00", "endTime": str(last) + " 00:00:00"})
+        if self.member_id is None:
+            self.profile()
         # Zoezi may return inclusive boundaries. Apply an explicit half-open window.
-        rows = [self.normalize(row) for row in (data or {}).get("workouts", [])]
+        rows = [self.normalize(row) for row in (data or {}).get("workouts", []) if row.get("user_id") in (None, self.member_id)]
         return sorted([row for row in rows if row["start"] and first <= local_time(row["start"], self.tz).date() < last], key=lambda row: row["start"])
 
     def schedule(self, *, start=None, days=7, name=None, site=None, bookable_only=False):
@@ -336,7 +343,7 @@ class Client:
                 raise ZoeziError("workout_full", "Workout is full; use waitlist join if desired.", exit_code=1)
             if operation == "join" and not workout["queue_enabled"]:
                 raise ZoeziError("queue_disabled", "The facility has disabled workout queues.", exit_code=1)
-            if operation == "join" and workout["spots_available"] != 0:
+            if operation == "join" and workout["spots_available"] is not None and workout["spots_available"] != 0:
                 raise ZoeziError("workout_not_full", "Use bookings create for an available place.", exit_code=1)
         deadline = local_time(workout["cancellation_deadline"], self.tz)
         late = bool(cancel and confirmed and (not deadline or self.now() > deadline))

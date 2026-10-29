@@ -23,7 +23,12 @@ No Zoezi credentials are used by CI. See README.md for setup and unattended auth
 assets = [str(p) for p in sorted((root / "dist").iterdir()) if p.is_file()]
 existing = subprocess.run(["gh", "release", "view", tag, "--repo", repository, "--json", "targetCommitish"], capture_output=True, text=True)
 if existing.returncode == 0:
-    assert json.loads(existing.stdout)["targetCommitish"] == sha, "Existing release targets another commit"
+    reference = json.loads(subprocess.check_output(["gh", "api", f"repos/{repository}/git/ref/tags/{tag}"], text=True))["object"]
+    for _ in range(5):
+        if reference["type"] != "tag":
+            break
+        reference = json.loads(subprocess.check_output(["gh", "api", f"repos/{repository}/git/tags/{reference['sha']}"], text=True))["object"]
+    assert reference["type"] == "commit" and reference["sha"] == sha, "Existing release tag targets another commit"
     subprocess.run(["gh", "release", "upload", tag, "--repo", repository, "--clobber", *assets], check=True)
 else:
     head = subprocess.check_output(["gh", "api", f"repos/{repository}/git/ref/heads/master", "--jq", ".object.sha"], text=True).strip()

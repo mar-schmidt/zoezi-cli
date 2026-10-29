@@ -42,10 +42,14 @@ def plan(client, existing, *, start=None, days=31, include_waitlist=False):
         if old is None:
             changes.append({"action": "create", "event": item})
         elif any(old.get(field) != item.get(field) for field in ("summary", "start", "end", "location", "status")):
+            if not old.get("event_id"):
+                raise ZoeziError("invalid_calendar_data", "Resolve the managed event's actual event_id before planning an update.", exit_code=1)
             changes.append({"action": "update", "event_id": old.get("event_id"), "event": item})
     for key, old in current.items():
         when = local_time(old.get("start"), client.tz)
         if key not in wanted and when and first <= when.date() < last:
+            if not old.get("event_id"):
+                raise ZoeziError("invalid_calendar_data", "Resolve the managed event's actual event_id before planning a deletion.", exit_code=1)
             changes.append({"action": "delete", "event_id": old.get("event_id"), "source_key": key})
     return {"calendar_id": client.config.get("calendar_id"), "changes": changes,
             "note": "Apply with your calendar connector, then read back. This command changes no calendar events."}

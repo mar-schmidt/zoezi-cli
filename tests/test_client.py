@@ -207,6 +207,25 @@ class ClientTests(unittest.TestCase):
         row.pop("numBooked")
         self.assertIsNone(self.client.normalize(row)["spots_available"])
 
+    def test_family_bookings_are_not_mistaken_for_own(self):
+        self.transport.own[102] = {**workout(102, "04"), "booked": True, "user_id": 999}
+        self.assertEqual([r["workout_id"] for r in self.client.bookings()], [101])
+        self.assertEqual(self.client.mutate_booking("create", 102)["state"], "confirmed")
+        self.assertEqual(len(self.posts()), 1)
+
+    def test_server_error_after_committed_write_is_reconciled(self):
+        original = self.transport.request
+
+        def request(method, path, **kwargs):
+            result = original(method, path, **kwargs)
+            if path.endswith("workoutBooking/add"):
+                raise ZoeziError("upstream_rejected", "Internal error", http_status=500)
+            return result
+
+        self.transport.request = request
+        self.assertTrue(self.client.mutate_booking("create", 102)["reconciled_after_transport_error"])
+        self.assertEqual(len(self.posts()), 1)
+
     def test_booking_not_yet_open(self):
         self.transport.settings["workoutcategories"][0]["registerDaysBefore"] = 1
         with self.assertRaises(ZoeziError) as err:

@@ -53,7 +53,7 @@ Read the returned `state`: `confirmed` is booked, `waitlisted` is a queue place,
 
 `join` enters the queue for a full workout via Zoezi's add-booking API. `claim` takes an offered available place from an existing queue entry via Zoezi's join API. Do not confuse them. Some queues promote automatically; others require a first-come claim. Read current status before acting. A place becoming available during queue joining can result in a confirmed booking; report the actual result.
 
-`waitlist leave` refuses to cancel an entry that became confirmed. On `confirmed_booking`, explain the promotion and use `bookings cancel` only if the user intended to cancel that reservation. Never automatically switch commands.
+`waitlist leave` refuses when preflight finds the entry already confirmed. On `confirmed_booking`, explain the promotion and use `bookings cancel` only if the user intended to cancel that reservation. Never automatically switch commands. Zoezi has no documented atomic queue-only removal: automatic promotion can race the status check and write; do not promise transactional protection.
 
 On `late_cancellation`, show the deadline and facility rules. Use `bookings cancel --allow-late` only after the user acknowledges possible consequences. Public settings do not describe every financial/warning policy; API acceptance does not prove a cancellation is free.
 
