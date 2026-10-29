@@ -1,0 +1,6 @@
+recursive-include .agent *.md *.yaml
+recursive-include scripts *.py
+recursive-include tests *.py
+recursive-include docs *.md
+include LICENSE
+include DISCLAIMER.md

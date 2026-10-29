@@ -1,0 +1,4 @@
+interface:
+  display_name: "Zoezi CLI"
+  short_description: "Manage class bookings and waitlists with Zoezi"
+  default_prompt: "Use $zoezi-cli to check my upcoming classes and book a suitable session."

@@ -1,0 +1,71 @@
+name: Test, build CLI and skill, release
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install development tools
+        run: python -m pip install -e ".[dev]"
+      - name: Lint and validate skill command examples
+        run: |
+          ruff check src tests scripts
+          python scripts/skill_package.py --check
+      - name: Test offline contracts and failure cases
+        run: python -m unittest discover -s tests -v
+      - name: Smoke-test installed executable
+        env:
+          ZOEZI_CONFIG_DIR: ${{ runner.temp }}/zoezi-smoke
+        run: |
+          zoezi --help
+          python scripts/smoke_cli.py
+
+  release:
+    name: Build and publish matching CLI and skill
+    needs: test
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[dev]"
+      - name: Build wheel, source distribution and skill from this commit
+        run: python scripts/build_release.py --build-number "$GITHUB_RUN_NUMBER" --commit "$GITHUB_SHA"
+      - name: Verify packaged CLI and skill
+        run: |
+          python scripts/verify_release.py
+          python -m venv "$RUNNER_TEMP/installed-cli"
+          "$RUNNER_TEMP/installed-cli/bin/python" -m pip install --no-deps dist/*.whl
+          "$RUNNER_TEMP/installed-cli/bin/zoezi" --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zoezi-cli-and-skill-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+      - name: Publish a release for this master commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/publish_release.py
