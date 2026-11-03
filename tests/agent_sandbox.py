@@ -6,13 +6,17 @@ from unittest.mock import patch
 
 from zoezi_cli.cli import main
 from zoezi_cli.client import Client
-from test_client import FakeTransport, NOW, TENANT
+from test_client import NOW, TENANT
+from test_checkin import CheckinTransport
+from zoezi_cli.errors import ZoeziError
 
 
 root = Path(os.environ["ZOEZI_SANDBOX_STATE"])
 root.mkdir(parents=True, exist_ok=True)
 os.environ["ZOEZI_CONFIG_DIR"] = str(root)
-transport = FakeTransport()
+transport = CheckinTransport()
+if os.environ.get("ZOEZI_SANDBOX_ENTRY_FAILURE"):
+    transport.entry_error = ZoeziError(os.environ["ZOEZI_SANDBOX_ENTRY_FAILURE"], "Response lost", exit_code=4)
 transport.rows[102].update(numBooked=10, numQueue=0)
 if (root / "synthetic-bookings.json").exists():
     data = json.loads((root / "synthetic-bookings.json").read_text())
@@ -26,4 +30,4 @@ finally:
     (root / "synthetic-bookings.json").write_text(json.dumps(transport.own))
     with (root / "calls.jsonl").open("a") as log:
         for method, path, params, body in transport.calls:
-            log.write(json.dumps({"method": method, "path": path, "params": params}) + "\n")
+            log.write(json.dumps(client.safe({"method": method, "path": path, "params": params, "body": body})) + "\n")

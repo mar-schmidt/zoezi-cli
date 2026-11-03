@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import __version__, calendar
+from . import __version__, calendar, checkin
 from .client import Client
 from .errors import ZoeziError, redact
 from .storage import read_json, state_lock, state_root
@@ -19,7 +19,7 @@ class Parser(argparse.ArgumentParser):
 
 
 def parser():
-    p = Parser(prog="zoezi", description="JSON-first personal Zoezi bookings. No BankID or browser required.")
+    p = Parser(prog="zoezi", description="JSON-first personal Zoezi bookings and QR check-in. No BankID or browser required.")
     p.add_argument("--version", action="version", version=__version__)
     p.add_argument("--url", help="Tenant URL (or ZOEZI_URL / saved setup)")
     p.add_argument("--timezone", help="IANA zone; default Europe/Stockholm")
@@ -77,6 +77,14 @@ def parser():
     for action in ("join", "leave", "claim"):
         mutation_args(waitlist.add_parser(action))
 
+    entry = commands.add_parser("checkin", help="Inspect a scanned QR resource and register your own entry").add_subparsers(dest="action", required=True)
+    for action in ("inspect", "qr"):
+        sub = entry.add_parser(action, help="Read-only QR lookup" if action == "inspect" else "Register one QR check-in; may consume a punch")
+        sub.add_argument("--qr-stdin", action="store_true", help="Read the scanned QR value from stdin instead of ZOEZI_QR_CODE / hidden prompt")
+        if action == "qr":
+            sub.add_argument("--dry-run", action="store_true", help="Resolve the resource and authenticate, without registering entry")
+            sub.add_argument("--allow-punch", action="store_true", help="Acknowledge a possible or unknown training-card punch deduction")
+
     cal = commands.add_parser("calendar").add_subparsers(dest="action", required=True)
     for action in ("events", "export", "plan"):
         sub = cal.add_parser(action)
@@ -110,6 +118,17 @@ def load_data(path):
         return json.load(sys.stdin) if path == "-" else json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise ZoeziError("invalid_json", "Cannot read the JSON input.", exit_code=1) from exc
+
+
+def qr_input(args):
+    if args.qr_stdin:
+        return sys.stdin.readline(4098).rstrip("\r\n")
+    code = os.environ.get("ZOEZI_QR_CODE")
+    if code is None:
+        if not sys.stdin.isatty():
+            raise ZoeziError("qr_code_required", "Use --qr-stdin or ZOEZI_QR_CODE for the scanned QR value.", exit_code=1)
+        code = getpass.getpass("Scanned Zoezi QR value: ")
+    return code
 
 
 def run(args, client):
@@ -160,6 +179,11 @@ def run(args, client):
         return {"workouts": rows, "count": len(rows), "timezone": str(client.tz)}
     if command == "workout":
         return {"workout": client.workout(args.workout_id)}
+    if command == "checkin":
+        code = qr_input(args)
+        if action == "inspect":
+            return checkin.inspect_qr(client, code)
+        return checkin.submit_qr(client, code, dry_run=args.dry_run, allow_punch=args.allow_punch)
     if command in ("bookings", "waitlist"):
         if action == "list":
             rows = client.bookings(start=args.date, days=args.days)
@@ -203,10 +227,10 @@ def main():
             output = {"ok": True, **result}
             print(json.dumps(client.safe(output) if client else redact(output), ensure_ascii=False))
     except ZoeziError as exc:
-        print(json.dumps(client.safe(exc.as_dict()) if client else redact(exc.as_dict(), [os.environ.get("ZOEZI_PASSWORD")]), ensure_ascii=False), file=sys.stderr)
+        print(json.dumps(client.safe(exc.as_dict()) if client else redact(exc.as_dict(), [os.environ.get("ZOEZI_PASSWORD"), os.environ.get("ZOEZI_QR_CODE")]), ensure_ascii=False), file=sys.stderr)
         raise SystemExit(exc.exit_code)
     except KeyboardInterrupt:
-        print(json.dumps({"ok": False, "error": "Interrupted; read bookings before repeating a write.", "code": "interrupted", "details": {}}), file=sys.stderr)
+        print(json.dumps({"ok": False, "error": "Interrupted; verify the operation before repeating a write. For check-in, check the app or reception.", "code": "interrupted", "details": {}}), file=sys.stderr)
         raise SystemExit(130)
     except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
         print(json.dumps({"ok": False, "error": "Local input or API response could not be processed.", "code": "invalid_data", "details": {"exception_type": type(exc).__name__}}), file=sys.stderr)

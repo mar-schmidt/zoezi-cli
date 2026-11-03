@@ -2,7 +2,7 @@
 
 A standalone, JSON-first CLI and agent skill for a member's own Zoezi class bookings. Inspired by the command contract of [mindbody-cli](https://github.com/mar-schmidt/mindbody-cli); it does not replace or depend on that project.
 
-Supports password-based, browserless login and unattended re-login, schedules, bookings, cancellations, queues, first-come queue claims, memberships, member onboarding and calendar handoff. No BankID implementation or browser automation is required.
+Supports password-based, browserless login and unattended re-login, schedules, bookings, cancellations, queues, first-come queue claims, memberships, member onboarding, QR-entry check-in and calendar handoff. No BankID implementation or browser automation is required.
 
 ## Install
 
@@ -70,11 +70,27 @@ Read the actual workout ID from the schedule. Dates in examples are illustrative
 - Booking an already confirmed class and removing an absent reservation are no-ops. Writes are read back before success is reported. A lost response is reconciled; timed-out writes are never repeated automatically.
 - Cancellation past the public deadline or with unknown policy requires `--allow-late`. Public rules may not expose every financial or warning consequence. Zoezi remains authoritative for training-card eligibility and booking limits.
 
+## QR-entry check-in
+
+```bash
+zoezi checkin inspect --qr-stdin          # read the scanned value from stdin; no entry registered
+zoezi checkin qr --qr-stdin --dry-run     # resolve the QR resource and authenticate; no entry registered
+zoezi checkin qr --qr-stdin               # submit one check-in for the current member
+```
+
+Supply the scanned QR value through stdin, `ZOEZI_QR_CODE` from a secret manager, or the hidden interactive prompt. QR values are never saved or included in normal output. Keep real codes out of shell arguments/history, shared logs, source control and CI. Inspection follows the official app's read-only `door/scan` lookup, without following any URL embedded in the QR. It can work without login; it does not validate membership. `--dry-run` also validates the current member session.
+
+Only active `qrcode_entry` resources are supported. Door-opening QR codes and other resource types are refused. The separate public `checkin` module flag can be false while QR entry works; `doctor` reports `qr_scanner_enabled` separately. Zoezi remains authoritative for eligibility. If the preview shows a possible or unknown training-card punch deduction, acknowledge that consequence with `--allow-punch` only when intended.
+
+Check in only when physically present and requesting entry registration. A successful response returns `state: checked_in`, `verified_by: zoezi_response` and `attendance_verified: false`. It confirms the QR-entry API accepted registration; it does not independently verify attendance at a particular class or a physical door opening. There is no booking or cancellation side effect in the CLI.
+
+**Check-in is not idempotent.** It can consume a training-card punch. The CLI submits once and never retries a failed check-in automatically, including an authentication error after submission. A timeout, server error or malformed acknowledgement returns `checkin_unknown` (exit 4). Check the app or reception before another attempt; booking lists and QR inspection cannot prove whether entry registered. Do not test by repeating the write or schedule automatic attendance from calendar events.
+
 ## Onboarding commands
 
 `profile`, `profile update --data-file <file> --dry-run`, `memberships --all`, `account fields`, `account create --data-file <file> --dry-run` and `auth reset-password --dry-run` cover profile inspection, facility field discovery, optional self-registration and reset-email requests. Use `-` instead of a data filename to read JSON from stdin. Only run the non-dry-run form when the user requested that action. Do not commit account-data files.
 
-Self-registration must be enabled by the facility, and required/changeable fields vary. The CLI does not silently accept legal terms, buy cards, pay bills, manage other people, check in or open doors. Pending terms and membership migration can require the facility's normal onboarding flow.
+Self-registration must be enabled by the facility, and required/changeable fields vary. The CLI does not silently accept legal terms, buy cards, pay bills, manage other people or open doors. Pending terms and membership migration can require the facility's normal onboarding flow.
 
 ## Family calendar
 
@@ -129,6 +145,7 @@ Success: one JSON object on stdout, `{"ok":true,...}`. Errors: one object on std
 | `ZOEZI_CONFIG_DIR` | Isolated configuration/session directory |
 | `ZOEZI_TIMEZONE` | IANA timezone |
 | `ZOEZI_API_KEY` | Optional registered integration key, if required by the tenant |
+| `ZOEZI_QR_CODE` | Scanned QR-entry value, supplied securely; never persisted |
 
 Use `auth logout` to revoke the current session and clear local state. Add `--forget-credentials` to remove the saved keychain password. Never share session files.
 

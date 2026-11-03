@@ -72,7 +72,7 @@ class PackageTests(unittest.TestCase):
     def test_skill_examples_parse_and_generated_manifest_covers_mutations(self):
         validate()
         names = {row["command"] for row in command_manifest()["commands"]}
-        self.assertTrue({"zoezi bookings create", "zoezi bookings cancel", "zoezi waitlist join", "zoezi waitlist claim", "zoezi waitlist leave", "zoezi auth login", "zoezi calendar plan"} <= names)
+        self.assertTrue({"zoezi bookings create", "zoezi bookings cancel", "zoezi waitlist join", "zoezi waitlist claim", "zoezi waitlist leave", "zoezi auth login", "zoezi calendar plan", "zoezi checkin inspect", "zoezi checkin qr"} <= names)
 
     def test_skill_archives_are_deterministic_and_versioned(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,6 +1,6 @@
 ---
 name: zoezi-cli
-description: Manage a member's own Zoezi gym or CrossFit class bookings using the zoezi CLI. Use for Zoezi onboarding, password login, schedules, booking or cancelling a workout, joining or leaving a waitlist, claiming a queue place, checking memberships and synchronizing bookings to a family calendar. Use in a Zoezi context; Mindbody uses a separate tool.
+description: Manage a member's own Zoezi gym or CrossFit classes and QR check-in using the zoezi CLI. Use for onboarding, password login, schedules, booking or cancelling a workout, joining or leaving a waitlist, claiming a queue place, checking memberships, QR entry check-in and synchronizing bookings to a family calendar. Use in a Zoezi context; Mindbody uses a separate tool.
 ---
 
 # Zoezi CLI
@@ -57,6 +57,22 @@ Read the returned `state`: `confirmed` is booked, `waitlisted` is a queue place,
 
 On `late_cancellation`, show the deadline and facility rules. Use `bookings cancel --allow-late` only after the user acknowledges possible consequences. Public settings do not describe every financial/warning policy; API acceptance does not prove a cancellation is free.
 
+## QR check-in
+
+    zoezi checkin inspect --qr-stdin
+    zoezi checkin qr --qr-stdin --dry-run
+    zoezi checkin qr --qr-stdin
+
+Supply the scanned value through stdin or `ZOEZI_QR_CODE` from a secret manager; the interactive CLI also offers a hidden prompt. Do not put real QR values in command arguments, repository/skill files, calendar events or logs. The CLI does not save QR values. Use a matching CLI release that includes `checkin`; upgrade an older CLI rather than hand-crafting API writes.
+
+Use check-in only when the user explicitly asks to register their own presence and is actually at the facility. A booking request, shared QR value, feature-development task or future reservation does not authorize registering attendance. Never schedule automatic check-ins from the class calendar.
+
+Run `checkin inspect` to resolve the resource at the configured facility. It performs a read-only lookup without requiring login; it does not prove membership eligibility. Then run `checkin qr --dry-run` to authenticate the current member and preview the exact resource. Require `type: qrcode_entry` and an active resource. Door and unknown QR types are refused: do not switch to door-opening APIs, bypass location requirements or invent GPS coordinates. Do not treat the separate `checkin_module_enabled: false` flag as disabling QR entry.
+
+After an authorized request, submit **once**. Use `--allow-punch` only after the user acknowledges the possible or unknown training-card punch deduction shown in the preview. `state: checked_in` requires Zoezi's explicit success response; it confirms QR entry registration. `attendance_verified: false` means individual class attendance was not independently read back. Do not say a specific class is marked present or a physical door opened based on this result.
+
+On `checkin_unknown`, an interrupted request, or a lost response, stop: the entry may already exist and a retry may deduct another punch. Check the app or reception before considering another submission. Booking lists, a successful QR inspection and a fresh login cannot establish whether entry registered. Never repeat a check-in merely to test idempotency or repair a calendar event.
+
 ## Family calendar
 
 Use the connected calendar tool and an explicitly identified family calendar. Discover an existing configured destination first; ask once if genuinely unknown. Do not invite/message a spouse just to make an existing shared event visible.
@@ -77,8 +93,8 @@ Parse JSON. Success is one stdout object with `ok: true`; failure is one stderr 
 | 1 | Input, policy or precondition | Correct arguments or explain the policy; do not repeat unchanged. |
 | 2 | Authentication or permission | Authenticate once from configured secrets; no loops or BankID. |
 | 3 | API rejection/rate limit | Surface the reason; do not poll or blindly retry writes. |
-| 4 | Network, lock or unknown result | Re-read bookings. Retry a read at most once. |
+| 4 | Network, lock or unknown result | Re-read bookings for booking writes; check the app/reception for check-in. Retry a read at most once. |
 
-On `mutation_unknown` or `mutation_unverified`, read `bookings list` for that date before considering another write. A timeout does not mean failure. The CLI verifies writes through readback and never automatically repeats a timed-out mutation. Its process lock serializes local commands.
+On `mutation_unknown` or `mutation_unverified`, read `bookings list` for that date before considering another booking write. For `checkin_unknown`, use the check-in recovery above. A timeout does not mean failure. The CLI verifies booking writes through readback and check-in through Zoezi's explicit response, and never automatically repeats a timed-out mutation. Its process lock serializes local commands.
 
 Read [references/workflows.md](references/workflows.md) for onboarding details, errors and calendar object formats. Release packages also contain generated `references/commands.json` with the exact command/flag contract.

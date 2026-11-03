@@ -58,7 +58,7 @@ class Client:
         self.auto_login = auto_login
         self.member_id = None
         self.username = os.environ.get("ZOEZI_USERNAME") or self.config.get("username")
-        self.secrets = [os.environ.get("ZOEZI_PASSWORD"), os.environ.get("ZOEZI_API_KEY")]
+        self.secrets = [os.environ.get("ZOEZI_PASSWORD"), os.environ.get("ZOEZI_API_KEY"), os.environ.get("ZOEZI_QR_CODE")]
         self._settings = None
         state = read_json(self.root / "session.json", {})
         if state.get("tenant") == self.tenant and (not self.username or state.get("username") == self.username):
@@ -391,6 +391,7 @@ class Client:
         return {"tenant": self.tenant, "facility": settings.get("name"), "api_version": settings.get("version"),
                 "timezone": str(self.tz), "password_login_enabled": bool((settings.get("login") or {}).get("mail")),
                 "workout_booking_enabled": bool(settings.get("workoutbooking")), "queue_enabled": bool(settings.get("canQueue")),
+                "qr_scanner_enabled": bool(settings.get("showqr")), "checkin_module_enabled": bool(settings.get("checkin")),
                 "registration_enabled": bool(settings.get("canCreate")), "calendar_id": self.config.get("calendar_id"),
                 "unattended_credentials_configured": bool(os.environ.get("ZOEZI_PASSWORD") or (self.username and CredentialStore(self.tenant, self.username).get()))}
 

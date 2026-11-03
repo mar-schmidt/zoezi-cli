@@ -16,7 +16,7 @@ class ZoeziError(Exception):
 
 
 PRIVATE_KEYS = re.compile(
-    r"^(?:password|newPassword|secret|token|(?:access|refresh|id)[_-]?token|api[_-]?key|(?:_.*)?session|icalendarid|login_key|personalCodeNumber)$",
+    r"^(?:password|newPassword|secret|token|(?:access|refresh|id)[_-]?token|api[_-]?key|(?:_.*)?session|icalendarid|login_key|personalCodeNumber|qrcode_entry_id|qr_code|qrcode)$",
     re.I,
 )
 

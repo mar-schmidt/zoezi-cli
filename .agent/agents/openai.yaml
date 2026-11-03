@@ -1,4 +1,4 @@
 interface:
   display_name: "Zoezi CLI"
-  short_description: "Manage class bookings and waitlists with Zoezi"
-  default_prompt: "Use $zoezi-cli to check my upcoming classes and book a suitable session."
+  short_description: "Manage Zoezi classes, waitlists and QR check-in"
+  default_prompt: "Use $zoezi-cli to manage my classes or check me in when I am at the gym."

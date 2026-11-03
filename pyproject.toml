@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "zoezi-cli"
 version = "0.1.0"
-description = "JSON-first personal Zoezi class booking CLI for agents and unattended jobs"
+description = "JSON-first Zoezi bookings, waitlists and QR check-in for agents"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
